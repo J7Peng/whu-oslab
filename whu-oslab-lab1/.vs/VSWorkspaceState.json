@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\include",
+    "\\kernel",
+    "\\kernel\\boot",
+    "\\kernel\\dev",
+    "\\kernel\\lib"
+  ],
+  "SelectedNode": "\\kernel\\boot\\start.c",
+  "PreviewInSolutionExplorer": false
+}

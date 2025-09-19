@@ -20,7 +20,7 @@ void main()
         while (started == 0);
         uart_init();
         print_init();
-        printf("hart %d starting\n", mycpuid());
+        printf("\nhart %d starting\n", (int)mycpuid());
     }
 
     while (1);    

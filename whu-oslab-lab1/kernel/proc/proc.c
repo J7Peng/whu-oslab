@@ -1,14 +1,13 @@
-//#include "proc/cpu.h"
-#include "riscv.h"
 #include "proc/proc.h"
+#include "riscv.h"
 
 static cpu_t cpus[NCPU];
 
 cpu_t* mycpu(void)
 {
     int id = mycpuid();
-    struct cpu *t = &cpus[id];
-    return t;
+    cpu_t *c = &cpus[id];
+    return c;
 }
 
 int mycpuid(void) 

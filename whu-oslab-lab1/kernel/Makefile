@@ -21,5 +21,3 @@ clean:
 			$(MAKE) clean --directory=$$d; \
 		done
 	rm -f ${KERNEL_ELF}
-
-

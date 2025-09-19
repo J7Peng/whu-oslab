@@ -284,19 +284,6 @@ static inline void sfence_vma()
   asm volatile("sfence.vma zero, zero");
 }
 
-// Physical Memory Protection
-static inline void
-w_pmpcfg0(uint64 x)
-{
-  asm volatile("csrw pmpcfg0, %0" : : "r" (x));
-}
-
-static inline void
-w_pmpaddr0(uint64 x)
-{
-  asm volatile("csrw pmpaddr0, %0" : : "r" (x));
-}
-
 // 内存管理相关
 
 #define PGSIZE 4096 // bytes per page
@@ -328,3 +315,32 @@ w_pmpaddr0(uint64 x)
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+
+
+#define MIE_STIE (1L << 5)
+
+static inline void w_pmpcfg0(uint64 x) {
+  asm volatile("csrw pmpcfg0, %0" : : "r"(x));
+}
+
+static inline void w_pmpaddr0(uint64 x) {
+  asm volatile("csrw pmpaddr0, %0" : : "r"(x));
+}
+
+
+static inline void w_menvcfg(uint64 x) {
+  // asm volatile("csrw menvcfg, %0" : : "r" (x));
+  asm volatile("csrw 0x30a, %0" : : "r"(x));
+}
+
+static inline void w_stimecmp(uint64 x) {
+  // asm volatile("csrw stimecmp, %0" : : "r" (x));
+  asm volatile("csrw 0x14d, %0" : : "r"(x));
+}
+
+static inline uint64 r_menvcfg() {
+  uint64 x;
+  // asm volatile("csrr %0, menvcfg" : "=r" (x) );
+  asm volatile("csrr %0, 0x30a" : "=r"(x));
+  return x;
+}

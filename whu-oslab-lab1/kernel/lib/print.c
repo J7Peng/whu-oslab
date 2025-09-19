@@ -142,9 +142,11 @@ void panic(const char *s)
 void assert(bool condition, const char* warning)
 {
     if (!condition) {
+        // 如果没有提供具体提示，就给一个默认信息
         if (warning && *warning)
             panic(warning);
         else
             panic("assertion failed");
     }
+    // condition 为真时什么都不做
 }

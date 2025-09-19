@@ -1,10 +1,17 @@
 # 这个文件负责公共的配置
 
-TOOLPREFIX = riscv64-linux-gnu-
-CC = ${TOOLPREFIX}gcc
-LD = ${TOOLPREFIX}ld
-OBJCOPY = ${TOOLPREFIX}objcopy
-OBJDUMP = ${TOOLPREFIX}objdump
+# 允许外部覆盖前缀；默认用裸机工具链
+CROSS_COMPILE ?= riscv64-unknown-elf-
+
+TOOLPREFIX := $(CROSS_COMPILE)
+
+override CC      := $(TOOLPREFIX)gcc
+override LD      := $(TOOLPREFIX)ld
+override OBJCOPY := $(TOOLPREFIX)objcopy
+override OBJDUMP := $(TOOLPREFIX)objdump
+
+export CROSS_COMPILE CC LD OBJCOPY OBJDUMP
+
 
 # 编译相关配置
 CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2

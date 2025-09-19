@@ -91,5 +91,3 @@ void uart_intr(void)
     uart_putc_sync(c);
   }
 }
-
-

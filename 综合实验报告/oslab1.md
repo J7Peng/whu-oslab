@@ -1,199 +1,218 @@
-# 实验1 RISC-V 引导与裸机启动
+- # 综合实验报告（report.md）
 
-## 一、实验目标
+  ## 一、系统设计部分
 
-本实验通过参考 xv6 的启动机制，实现一个最小操作系统的多核启动，并在 QEMU `virt` 平台上输出：
+  ### 架构设计说明
 
-```
-Hello OS!
-hart 1 starting
-```
+  本实验实现一个**最小多核 RISC-V 裸机操作系统**，目标是在 QEMU `virt` 平台上输出：
 
-实验目标包括：
+  ```
+  Hello OS!
+  hart 1 starting
+  ```
 
-- 理解 RISC-V 启动机制和裸机多核引导
-- 学习栈初始化、BSS 清零和链接脚本设计
-- 实现最小 UART 驱动和 `printf`/`panic` 输出机制
-- 理解多核共享资源访问和自旋锁使用
+  系统启动流程：
 
-------
+  1. **entry.S**：汇编入口，设置栈指针、清零 BSS、跳转到 `start()`
+  2. **start.c**：多核同步，hart0 初始化 UART 和自旋锁，其他 hart 等待 `started` 标志
+  3. **main.c**：输出 “Hello OS!” 和每个 hart 启动信息
+  4. **uart.c/print.c**：提供多类型 printf、panic/assert、UART 输出
+  5. **spinlock.c**：自旋锁实现，保护多核打印安全
 
-## 二、系统设计部分
+  ------
 
-### 架构设计说明
+  ### 关键数据结构
 
-系统运行在 **RISC-V M-mode**，每个 hart 启动流程如下：
+  | 模块           | 数据结构                | 说明                                            |
+  | -------------- | ----------------------- | ----------------------------------------------- |
+  | spinlock.c     | `spinlock_t`            | 自旋锁，保护共享资源 UART、打印                 |
+  | uart.c         | UART 寄存器 (THR/LSR)   | 实现字符输出，检测 THRE 位完成发送              |
+  | print.c        | `volatile int panicked` | 避免 panic 后多核打印冲突                       |
+  | start.c/main.c | `volatile int started`  | hart0 初始化完成标志，多核同步                  |
+  | entry.S        | `CPU_stack`             | 每个 hart 独立 4KB 栈，用异常实现跳转到main函数 |
 
-1. **entry.S**：设置栈指针、跳转到 C 语言主函数
-2. **start.c/main()**：
-   - hart0 初始化 UART 和打印锁
-   - 设置 `started` 标志，通知其他 hart
-   - 各 hart 调用 `printf` 输出启动信息
-3. **死循环**：防止程序意外退出
+  ------
 
-### 关键数据结构
+  ### 与 xv6 对比分析
 
-- **UART 寄存器**
-  - `THR (0x10000000)`：发送字符
-  - `LSR (0x10000005)`：检查发送完成
-- **栈**
-  - 每个 hart 使用独立 4KB 栈
-- **链接符号**
-  - `_entry`：程序入口
-  - `_bss_start`、`_bss_end`：BSS 段清零范围
-- **自旋锁**
-  - `print_lk`：保护多核同时输出 UART
+  - **相同点**：
+    - 启动栈设置、BSS 清零
+    - 多核启动
+    - UART 输出作为调试手段
+  - **不同点**：
+    - 简化内存管理、trap、分页和任务调度
+    - 无用户态进程和上下文切换
+    - 多核输出仅保证打印安全，不涉及任务调度
 
-### 与 xv6 对比
+  ------
 
-- **相同点**
-  - 启动栈设置、BSS 清零
-  - UART 输出验证启动成功
-- **不同点**
-  - 本实验简化内存管理、trap 和中断处理
-  - 多核支持仅限打印同步，不涉及任务调度
+  ### 设计决策理由
 
-### 设计决策理由
+  - 栈：4KB/核，保证 C 调用安全
+  - BSS 清零：保证全局变量为 0，防止乱码
+  - UART 初始化由 hart0 完成，避免多核冲突
+  - 自旋锁全局共享，保证 printf 输出多核安全
+  - 死循环：防止 hart 越界或 QEMU 重启
 
-- 栈：保证 C 调用正确
-- BSS 清零：保证全局未初始化变量为 0
-- UART 输出：提供最直观调试方式
-- 死循环：防止 hart 执行越界或系统重启
-- 自旋锁：保证多核打印不会交错
+  ------
 
-------
+  ## 二、实验过程部分
 
-## 三、实验过程部分
+  ### 实现步骤记录
 
-### 实现步骤
+  1. **entry.S**
 
-1. **启动汇编 entry.S**
+  ```
+  .section .text
+  _entry:
+          la sp, CPU_stack         # 栈基址
+          li a0, 4096
+          add sp, sp, a0           # 每核偏移栈
+          call start               # 跳转 C 启动函数
+  spin:
+          j spin
+  ```
 
-```
-.section .text
-_entry:
-        la sp, CPU_stack         # 栈基址
-        li a0, 4096
-        add sp, sp, a0
-        call start               # 跳转到 C 语言启动函数
-spin:
-        j spin
-```
+  - 设置每核栈、跳转 C 函数
 
-1. **链接脚本 kernel.ld**
+  1. **kernel.ld**（链接脚本）
 
-```
-ENTRY(_entry)
-SECTIONS {
-    . = 0x80000000;
-    .text : { *(.text*) }
-    .data : { *(.data*) }
-    .bss : { _bss_start = .; *(.bss*); _bss_end = .; }
-}
-```
+  ```
+  ENTRY(_entry)
+  SECTIONS {
+      . = 0x80000000;
+      .text : { *(.text*) }
+      .data : { *(.data*) }
+      .bss : { _bss_start = .; *(.bss*); _bss_end = .; }
+  }
+  ```
 
-1. **UART 驱动和打印**
+  - 指定入口、段组织、定义 BSS
 
-- `uart_putc_sync`：发送字符前检查 LSR 的 THRE 位
-- `printf`：支持 `%d`, `%x`, `%p`, `%s`, `%c`，支持 `long` / `long long`
-- 使用全局自旋锁 `print_lk`，保证多核打印安全
+  1. **start.c**
 
-1. **主函数 main.c**
+  ```
+  extern void main();
+  volatile int started = 0;
+  
+  void start() {
+      if (mycpuid() == 0) {
+          uart_init();
+          print_init();
+          main();
+          started = 1;
+      } else {
+          while (!started);
+          main();
+      }
+  }
+  ```
 
-```
-volatile int started = 0;
+  - 多核同步，hart0 初始化 UART/打印锁
 
-void main() {
-    if (mycpuid() == 0) {
-        uart_init();
-        print_init();
-        printf("Hello OS!\n");
-        __sync_synchronize();
-        started = 1;
-    } else {
-        while (!started);
-    }
+  1. **main.c**
 
-    printf("hart %d starting\n", mycpuid());
-    while (1);
-}
-```
+  ```
+  void main() {
+      if (mycpuid() == 0)
+          printf("Hello OS!\n");
+      printf("hart %d starting\n", mycpuid());
+      while(1); // 防止程序退出
+  }
+  ```
 
-### 问题与解决方案
+  1. **uart.c**
 
-| 问题               | 解决方案                                        |
-| ------------------ | ----------------------------------------------- |
-| 输出乱码或丢失     | hart0 初始化 UART，其他 hart 等待 `started`     |
-| 自旋锁不同实例     | 全局锁由 hart0 初始化，其他 hart 使用同一锁     |
-| BSS 未清零         | 在 `start()` 中清零 `_bss_start`~`_bss_end`     |
-| 多核输出顺序不可控 | 可按 hartid 顺序打印或通过 `started` 分阶段输出 |
+  ```
+  void uart_putc_sync(char c) {
+      while (!(load_8(LSR_ADDR) & 0x20)); // 等待 THR 空
+      store_8(THR_ADDR, c);
+  }
+  ```
 
-### 源码理解总结
+  - 最小 UART 输出，实现字符发送
 
-- **entry.S**：设置栈、跳转到 C，保证 M-mode 能执行 C 函数
-- **main.c/start.c/uart.c**：多核同步、UART 初始化
-- **print.c**：全局自旋锁保护、多类型 printf、多核安全 panic/assert
+  1. **print.c**
 
-------
+  - 支持 `%d/%x/%p/%s/%c`
+  - 使用全局自旋锁保护多核打印
+  - `panic/assert` 提供错误提示
 
-## 四、测试验证部分
+  1. **spinlock.c**
 
-### 功能测试结果
+  ```
+  void spinlock_acquire(spinlock_t *lk);
+  void spinlock_release(spinlock_t *lk);
+  ```
 
-QEMU 输出：
+  - 保护共享资源（UART、printf）
 
-```
-Hello OS!
-hart 1 starting
-```
+  ------
 
-输出完整，字符无乱码。
+  ### 问题与解决方案
 
-### 性能数据
+  | 问题           | 原因                   | 解决方案                                                |
+  | -------------- | ---------------------- | ------------------------------------------------------- |
+  | hart 输出丢失  | 多核同时初始化 UART/锁 | 由 hart0 初始化 UART 和全局锁，其他 hart 等待 `started` |
+  | 输出乱码       | BSS 未清零，栈冲突     | 清零 BSS，每核独立栈                                    |
+  | 自旋锁不同实例 | 每核初始化锁           | hart0 初始化全局锁，其他 hart 使用同一锁                |
 
-- 程序大小 < 10KB
-- 启动耗时 < 0.1s
+  ------
 
-### 异常测试
+  ### 源码理解总结
 
-- 去掉 BSS 清零 → 全局变量值异常
-- 错误入口点 → QEMU 卡死
-- 未检查 LSR → 输出丢字符
+  - **entry.S**：设置栈、清零 BSS、跳转 start.c
+  - **start.c/main.c**：多核同步，输出 "Hello OS!" 和 hart 启动信息
+  - **uart.c**：最小字符输出，检查 LSR THRE
+  - **print.c**：printf 支持多类型、全局自旋锁、多核安全 panic/assert
+  - **spinlock.c**：自旋锁 acquire/release，保护共享资源
 
-### 运行截图
+  ------
 
-![image-20250919175539606](C:\Users\34302\AppData\Roaming\Typora\typora-user-images\image-20250919175539606.png)
+  ## 三、测试验证部分
 
-------
+  ### 功能测试结果
 
-## 五、思考题回答
+  QEMU 输出：
 
-### 1. 启动栈的设计
+  ```
+  Hello OS!
+  hart 1 starting
+  hart 2 starting
+  ```
 
-- 栈大小：4KB 足够嵌套调用
-- 栈溢出：覆盖内存，可能导致 hart 崩溃
-- 检测：栈边界设置保护值
+  - 输出完整、字符无乱码、hart 顺序正确
 
-### 2. BSS 段清零
+  ### 性能数据
 
-- 不清零 → 未初始化全局变量值随机
-- 可省略条件：全局变量不被使用，但一般不推荐
+  - 程序大小 <10 KB
+  - 启动耗时 <0.1 s
 
-### 3. 与 xv6 对比
+  ### 异常测试
 
-- 简化部分：页表、trap、中断、多进程调度
-- 可能问题：后续多任务和用户态运行受限
+  - 未清零 BSS → 全局变量值随机
+  - UART 未初始化 → 输出丢失
+  - 移除自旋锁 → 多核打印交错
+  - 错误入口 `_entry` → QEMU 卡死
 
-### 4. 错误处理
+  ### 运行截图/录屏
 
-- UART 初始化失败 → 死循环或复位
-- 最小错误显示机制 → 串口打印 `'E'` 或点亮 I/O 指示灯
+  ![image-20250919190303260](C:\Users\34302\AppData\Roaming\Typora\typora-user-images\image-20250919190303260.png)
 
-------
+  ------
 
-## 六、结论
+  ## 四、思考题回答
 
-- 成功实现多核裸机启动
-- 全局打印机制和 panic/assert 多核安全
-- 学习了栈初始化、BSS 清零、UART 驱动、链接脚本设计
-- 为后续多核操作系统开发打下基础
+  1. **启动栈设计**
+     - 每核 4KB，保证函数调用安全
+     - 栈溢出 → 覆盖内存，hart 崩溃
+     - 检测方法：在栈边界设置标记
+  2. **BSS 段清零**
+     - 不清零 → 未初始化变量值随机
+     - 可省略条件：不使用全局未初始化变量
+  3. **与 xv6 对比**
+     - 无页表、中断、任务调度
+     - 优势：易理解，控制多核启动
+     - 缺点：不支持用户态、多任务
+  4. **错误处理**
+     - panic错误信息

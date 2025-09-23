@@ -21,7 +21,7 @@ printint(int xx, int base, int sign)
 {
   char buf[16];
   int i;
-  uint8 x;
+  uint64 x;
 
   if(sign && (sign = xx < 0))
     x = -xx;

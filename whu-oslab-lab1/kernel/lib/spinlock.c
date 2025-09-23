@@ -47,7 +47,7 @@ void spinlock_init(spinlock_t *lk, char *name)
 {
     lk->name = name;
     lk->locked = 0;
-    lk->cpuid = 0;
+    lk->cpuid = -1;
 }
 
 // 获取自选锁
@@ -77,7 +77,7 @@ void spinlock_release(spinlock_t *lk)
 {
     if(!holding(lk)) panic("release");
 
-    lk->cpuid = 0;
+    lk->cpuid = -1;
 
   // Tell the C compiler and the CPU to not move loads or stores
   // past this point, to ensure that all the stores in the critical

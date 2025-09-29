@@ -2,7 +2,10 @@
 #define __VMEM_H__
 
 #include "common.h"
-
+#include "riscv.h"
+#include "lib/str.h"   // memset
+#include "lib/lock.h"  
+#include "lib/print.h"
 /*
     我们使用RISC-V体系结构中的SV39作为虚拟内存的设计规范
 
@@ -49,11 +52,11 @@ typedef uint64* pgtbl_t;
 #define PTE_TO_PA(pte) (((pte) >> 10) << 12)
 
 // 页面权限控制 
-#define PTE_V (1 << 0) // valid
-#define PTE_R (1 << 1) // read
-#define PTE_W (1 << 2) // write
-#define PTE_X (1 << 3) // execute
-#define PTE_U (1 << 4) // user
+// #define PTE_V (1 << 0) // valid
+// #define PTE_R (1 << 1) // read
+// #define PTE_W (1 << 2) // write
+// #define PTE_X (1 << 3) // execute
+//#define PTE_U (1 << 4) // user
 #define PTE_G (1 << 5) // global
 #define PTE_A (1 << 6) // accessed
 #define PTE_D (1 << 7) // dirty

@@ -1,3 +1,6 @@
+#ifndef __RISCV_H__
+#define __RISCV_H__
+
 #include "common.h"
 
 // 获取当前CPU的hartid
@@ -344,3 +347,5 @@ static inline uint64 r_menvcfg() {
   asm volatile("csrr %0, 0x30a" : "=r"(x));
   return x;
 }
+
+#endif

@@ -8,8 +8,4 @@ void uart_putc_sync(int c);
 int  uart_getc_sync(void);
 void uart_intr(void);
 
-
-void uart_putc(char);
-void uart_puts(char *);
-
 #endif

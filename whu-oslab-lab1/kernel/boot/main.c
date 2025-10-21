@@ -148,9 +148,9 @@ int main(void)
         trap_kernel_init();
         print_init();
         uart_init();
-        //pmem_init();
-        //kvm_init();
-        //kvm_inithart();
+        // pmem_init();
+        // kvm_init();
+        // kvm_inithart();
 
         // 安装 S-mode trap 入口（全局一次）
        
@@ -167,6 +167,7 @@ int main(void)
         // 心跳观测循环：每 10 tick 打印一次
         uint64 last = timer_get_ticks();
         while (1) {
+            
             uint64 t = timer_get_ticks();
             if (t != last) {
                 if ((t % 10) == 0) {     // 假设 INTERVAL=0.1s → 约 1 秒打印
@@ -183,21 +184,18 @@ int main(void)
 
         // 每核初始化：打开本核中断 & 预约本核 stimecmp
         trap_kernel_inithart();
-
         printf("cpu %d is booting! Sstc timer armed.\n", id);
 
         // 次核也跑一个轻量观测（减少刷屏：每 50 tick 打印一次）
         uint64 last = timer_get_ticks();
         while (1) {
-            printf("while");
-            uint64 t1 = timer_get_ticks();
-            if (t1 != last) {
-                if ((t1 % 50) == 0) {
-                    printf("[cpu%d] ticks=%d\n", id, t1);
+            uint64 t = timer_get_ticks();
+            if (t != last) {
+                if ((t % 50) == 0) {
+                    printf("[cpu%d] ticks=%d\n", id, t);
                 }
-                last = t1;
+                last = t;
             }
-            else printf("same!\n");
         }
     }
 }

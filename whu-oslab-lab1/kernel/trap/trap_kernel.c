@@ -54,43 +54,39 @@ extern void kernel_vector();
 // 初始化trap中全局共享的东西
 void trap_kernel_init()
 {
-    w_stvec((uint64)kernel_vector); 
-
-    // 全局 PLIC 初始化
-    plic_init(); 
+    plic_init();
+    w_sip(0);
 }
+
 
 // 各个核心trap初始化
 void trap_kernel_inithart()
-{   
-    // 打开本核 S-mode timer interrupt
-    plic_inithart();         // 外设中断
-    w_sie(r_sie() | SIE_STIE); // 开启所有 S-mode 中断
-    intr_on();
+{
+    timer_create();
+    w_stvec((uint64)kernel_vector);
+    plic_inithart();
 }
 
 // 外设中断处理 (基于PLIC)
 void external_interrupt_handler()
 {
-    int irq = plic_claim(); // 获取待处理外设中断号
-
-    if (irq == 0) {
-        // PLIC 号为0表示没有有效中断，忽略
-        return;
+    int hart = mycpuid();
+    int irq = plic_claim();//领取中断号
+    
+    switch (irq)
+    {
+    case 0:                 // 无中断
+        break;
+    case UART_IRQ:             // 串口中断（键盘输入）
+        uart_intr();
+        break;
+    default:
+        printf("unexpected PLIC irq=%d on hart=%d\n", irq, hart);
+        break;
     }
-
-    // 处理 UART 中断示例
-    if (irq == UART_IRQ) {
-        int c = uart_getc_sync();
-        if (c != -1) {
-            uart_putc_sync(c); // 回显字符
-        }
-    }
-
-    // 完成处理，通知 PLIC
-    plic_complete(irq);
+    if (irq)
+    plic_complete(irq);//完成中断处理
 }
-
 // 时钟中断处理 (基于CLINT)
 void timer_interrupt_handler()
 {
@@ -122,7 +118,7 @@ void trap_kernel_handler()
 
     int trap_id = scause & 0xf; 
 
-    if (scause & (1UL << 63)) {
+    if ( (scause >> 63) & 1) {
         // 中断
         switch(trap_id) {
             case 5: // S-mode timer interrupt

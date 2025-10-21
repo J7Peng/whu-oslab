@@ -32,25 +32,25 @@ static timer_t sys_timer;
 // 时钟创建(初始化系统时钟)
 void timer_create()
 {
-    int hart = mycpuid();
-    if (hart == 0)
+    if(mycpuid()==0)
     {
         sys_timer.ticks = 0;
         spinlock_init(&sys_timer.lk, "timer");
-        w_stimecmp(r_time() + INTERVAL);
     }
-    // 允许 S-mode 全局中断
-    w_sstatus(r_sstatus() | SSTATUS_SIE);
-    printf("hart%d timer create \n",mycpuid());
+    // 2) 打开 S 态中断：
+    
+      // 设置下一个时钟中断时间
+     w_stimecmp(r_time() + INTERVAL);
+    // //    - sstatus.SIE：S 态全局中断开关
+     w_sstatus(r_sstatus()| SSTATUS_SIE);//允许S态中断
+  
+    
 }
 
 
 // 时钟更新(ticks++ with lock)
 void timer_update()
 {
-    int hart = mycpuid();
-    if (hart != 0) return; // 非 hart0 不更新 ticks
-
     spinlock_acquire(&sys_timer.lk);
     sys_timer.ticks++;
     spinlock_release(&sys_timer.lk);

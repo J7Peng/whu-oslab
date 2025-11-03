@@ -348,4 +348,14 @@ static inline uint64 r_menvcfg() {
   return x;
 }
 
+
+// Supervisor Scratch register read
+static inline uint64 r_sscratch()
+{
+  uint64 x;
+  asm volatile("csrr %0, sscratch" : "=r" (x));
+  return x;
+}
+
+
 #endif

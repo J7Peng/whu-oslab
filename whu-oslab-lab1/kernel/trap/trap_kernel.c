@@ -3,7 +3,7 @@
 #include "dev/uart.h"
 #include "dev/plic.h"
 #include "trap/trap.h"
-#include "proc/proc.h"
+#include "proc/cpu.h"
 #include "memlayout.h"
 #include "riscv.h"
 
@@ -62,9 +62,10 @@ void trap_kernel_init()
 // 各个核心trap初始化
 void trap_kernel_inithart()
 {
-    timer_create();
     w_stvec((uint64)kernel_vector);
     plic_inithart();
+    timer_create();
+    w_sstatus(r_sstatus() | SSTATUS_SIE);
 }
 
 // 外设中断处理 (基于PLIC)
@@ -141,8 +142,19 @@ void trap_kernel_handler()
         printf("exeption!%d\n", trap_id);
         
         // 异常
-        if (trap_id < 16)
+        if (trap_id < 16){
+            //for test
+            uint64 scause = r_scause();
+            uint64 sepc   = r_sepc();
+            uint64 stval  = r_stval();
+            uint64 satp   = r_satp();
+            proc_t *p = myproc();
+            int pid = p ? p->pid : -1;
+            printf("EXC: scause=%d sepc=0x%d stval=0x%d satp=0x%d pid=%d\n",scause, sepc, stval, satp, pid);
+            //
             panic(exception_info[trap_id]);
+        }
+            
         else
             panic("Unknown exception");
     }

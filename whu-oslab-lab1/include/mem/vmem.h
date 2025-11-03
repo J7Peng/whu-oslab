@@ -6,6 +6,7 @@
 #include "lib/str.h"   // memset
 #include "lib/lock.h"  
 #include "lib/print.h"
+#include "memlayout.h"
 /*
     我们使用RISC-V体系结构中的SV39作为虚拟内存的设计规范
 
@@ -70,6 +71,9 @@ typedef uint64* pgtbl_t;
 // 定义一个相当大的VA, 规定所有VA不得大于它
 #define VA_MAX (1ul << 38)
 
+#define MEM_BASE 0x80000000UL
+#define KVA2PA(kva) ((uint64)(kva))
+
 void   vm_print(pgtbl_t pgtbl);
 pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc);
 void   vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm);
@@ -77,5 +81,7 @@ void   vm_unmappages(pgtbl_t pgtbl, uint64 va, uint64 len, bool freeit);
 
 void   kvm_init();
 void   kvm_inithart();
+
+
 
 #endif

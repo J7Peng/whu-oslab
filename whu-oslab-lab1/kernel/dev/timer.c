@@ -4,6 +4,7 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include"proc/proc.h"
+#include "proc/cpu.h"
 
 /*-------------------- 工作在M-mode --------------------*/
 
@@ -42,7 +43,7 @@ void timer_create()
       // 设置下一个时钟中断时间
      w_stimecmp(r_time() + INTERVAL);
     // //    - sstatus.SIE：S 态全局中断开关
-     w_sstatus(r_sstatus()| SSTATUS_SIE);//允许S态中断
+     //w_sstatus(r_sstatus()| SSTATUS_SIE);//允许S态中断
   
     
 }

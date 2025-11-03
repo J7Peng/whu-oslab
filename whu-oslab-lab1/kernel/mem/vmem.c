@@ -1,6 +1,7 @@
 #include "mem/vmem.h"      
 #include "mem/pmem.h"      // pmem_alloc / pmem_free
 
+extern char trampoline[];
 
 
 
@@ -70,7 +71,8 @@ void vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm) {
             // 改进：允许覆盖已有映射
         }
 
-        *pte = PA_TO_PTE(pa) | (perm & 0x3FF) | PTE_V;
+        *pte = PA_TO_PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
+
 
         start = a + PGSIZE;
         pa += PGSIZE;
@@ -123,11 +125,19 @@ void kvm_init() {
    
     memset(kernel_pgtbl, 0, PGSIZE);
 
-   
     vm_mappages(kernel_pgtbl, REG_BASE, REG_BASE, REG_SIZE, PTE_R | PTE_W);
-
-
     vm_mappages(kernel_pgtbl, MEM_BASE, MEM_BASE, MEM_SIZE, PTE_R | PTE_W | PTE_X);
+    // trampoline 映射
+    uint64 trampoline_pa = KVA2PA((void*)trampoline);
+    
+    vm_mappages(kernel_pgtbl, (uint64)TRAMPOLINE, trampoline_pa, PGSIZE, PTE_A|PTE_V|PTE_R | PTE_X);
+    //UART映射
+    vm_mappages(kernel_pgtbl,UART_BASE,UART_BASE,PGSIZE,PTE_R | PTE_W);
+    // PLIC映射
+    vm_mappages(kernel_pgtbl, PLIC_BASE, PLIC_BASE, 0x400000, PTE_R | PTE_W);
+
+
+    
 }
 
 void kvm_inithart() {

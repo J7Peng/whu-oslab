@@ -31,4 +31,8 @@
 #define CLINT_MTIME (CLINT_BASE + 0xBFF8)
 
 
+// for trap
+#define TRAMPOLINE (MAXVA - PGSIZE)
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
 #endif

@@ -168,7 +168,8 @@ int main(void)
         trap_kernel_inithart();   // 内部应打开 SIE_STIE + SSTATUS_SIE
         printf("trap_kernel_inithart\n");
 
-        //timer_create();           // 预约首次 stimecmp = time + INTERVAL
+        
+        //timer_init();           // 预约首次 stimecmp = time + INTERVAL
 
         
         proc_make_first(); 
@@ -184,7 +185,7 @@ int main(void)
         // 等待 boot 核完成全局初始化
         while (started == 0) { /* spin */ }
         __sync_synchronize();
-
+        printf("kernel%d started",id);
         
         trap_kernel_inithart();
         printf("cpu %d is booting! Sstc timer armed.\n", id);

@@ -64,7 +64,7 @@ void trap_kernel_inithart()
 {
     w_stvec((uint64)kernel_vector);
     plic_inithart();
-    timer_create();
+    //timer_create();
     w_sstatus(r_sstatus() | SSTATUS_SIE);
 }
 
@@ -140,7 +140,6 @@ void trap_kernel_handler()
         }
     } else {
         printf("exeption!%d\n", trap_id);
-        
         // 异常
         if (trap_id < 16){
             //for test

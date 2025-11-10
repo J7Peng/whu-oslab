@@ -71,7 +71,6 @@ typedef uint64* pgtbl_t;
 // 定义一个相当大的VA, 规定所有VA不得大于它
 #define VA_MAX (1ul << 38)
 
-#define MEM_BASE 0x80000000UL
 #define KVA2PA(kva) ((uint64)(kva))
 
 void   vm_print(pgtbl_t pgtbl);

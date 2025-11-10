@@ -101,14 +101,7 @@ void proc_make_first()
     uint64 pa_code = (uint64)pmem_alloc(false);
     memset((void*)pa_code, 0, PGSIZE);
     memmove((void*)pa_code, initcode, initcode_len);
-//for test
-unsigned char *code_kva = (unsigned char*)pa_code;
-printf("initcode bytes:");
-for (int i = 0; i < 16 && i < initcode_len; ++i)
-    printf(" %x", (int)code_kva[i]);
-printf("\n");
-printf("initcode_len=%d\n", (int)initcode_len);
-//end
+
 
     vm_mappages(p->pgtbl, uva_code, pa_code, PGSIZE, PTE_R | PTE_W | PTE_X | PTE_U);
 

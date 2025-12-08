@@ -35,4 +35,7 @@
 #define TRAMPOLINE (MAXVA - PGSIZE)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
 
+#define ALIGN_UP(addr,refer) (((addr) + (refer) - 1) & ~((refer) - 1))
+#define ALIGN_DOWN(addr,refer) ((addr) & ~((refer) - 1))
+
 #endif

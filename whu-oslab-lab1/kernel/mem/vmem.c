@@ -128,7 +128,7 @@ void kvm_init() {
     vm_mappages(kernel_pgtbl, REG_BASE, REG_BASE, REG_SIZE, PTE_R | PTE_W);
     vm_mappages(kernel_pgtbl, MEM_BASE, MEM_BASE, MEM_SIZE, PTE_R | PTE_W | PTE_X);
     // trampoline 映射
-    uint64 trampoline_pa = KVA2PA((void*)trampoline);
+    uint64 trampoline_pa =(uint64)trampoline;
     
     vm_mappages(kernel_pgtbl, (uint64)TRAMPOLINE, trampoline_pa, PGSIZE, PTE_A|PTE_V|PTE_R | PTE_X);
     //UART映射
@@ -136,8 +136,6 @@ void kvm_init() {
     // PLIC映射
     vm_mappages(kernel_pgtbl, PLIC_BASE, PLIC_BASE, 0x400000, PTE_R | PTE_W);
 
-
-    
 }
 
 void kvm_inithart() {

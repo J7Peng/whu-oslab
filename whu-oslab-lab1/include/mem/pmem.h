@@ -2,7 +2,6 @@
 #define __PMEM_H__
 
 #include "common.h"
-#include "lib/lock.h"
 
 // 来自kernel.ld
 extern char KERNEL_DATA[];

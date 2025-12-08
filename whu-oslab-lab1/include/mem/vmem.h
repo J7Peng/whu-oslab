@@ -7,6 +7,8 @@
 #include "lib/lock.h"  
 #include "lib/print.h"
 #include "memlayout.h"
+#include "mem/mmap.h"
+
 /*
     我们使用RISC-V体系结构中的SV39作为虚拟内存的设计规范
 
@@ -33,11 +35,11 @@
     PPN区域 : 存放物理页号
 
 */
+#define PAGE_SIZE 4096
+#define VA_MAX (1L << 38)
 
-// 页表项
 typedef uint64 pte_t;
 
-// 顶级页表
 typedef uint64* pgtbl_t;
 
 // satp寄存器相关
@@ -53,11 +55,11 @@ typedef uint64* pgtbl_t;
 #define PTE_TO_PA(pte) (((pte) >> 10) << 12)
 
 // 页面权限控制 
-// #define PTE_V (1 << 0) // valid
-// #define PTE_R (1 << 1) // read
-// #define PTE_W (1 << 2) // write
-// #define PTE_X (1 << 3) // execute
-//#define PTE_U (1 << 4) // user
+#define PTE_V (1 << 0) // valid
+#define PTE_R (1 << 1) // read
+#define PTE_W (1 << 2) // write
+#define PTE_X (1 << 3) // execute
+#define PTE_U (1 << 4) // user
 #define PTE_G (1 << 5) // global
 #define PTE_A (1 << 6) // accessed
 #define PTE_D (1 << 7) // dirty
@@ -68,19 +70,31 @@ typedef uint64* pgtbl_t;
 // 获取低10bit的flag信息
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
-// 定义一个相当大的VA, 规定所有VA不得大于它
-#define VA_MAX (1ul << 38)
-
-#define KVA2PA(kva) ((uint64)(kva))
+/*---------------------- in kvm.c -------------------------*/
 
 void   vm_print(pgtbl_t pgtbl);
 pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc);
-void   vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm);
-void   vm_unmappages(pgtbl_t pgtbl, uint64 va, uint64 len, bool freeit);
+void   vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm);//
+void   vm_unmappages(pgtbl_t pgtbl, uint64 va, uint64 len, bool freeit);//
 
-void   kvm_init();
-void   kvm_inithart();
+void   kvm_init();//
+void   kvm_inithart();//
 
+/*------------------------ in uvm.c -----------------------*/
 
+void   uvm_show_mmaplist(mmap_region_t* mmap);
+
+void   uvm_destroy_pgtbl(pgtbl_t pgtbl, uint32 level);//freepgtbl
+void   uvm_copy_pgtbl(pgtbl_t old, pgtbl_t new, uint64 heap_top, uint32 ustack_pages, mmap_region_t* mmap);//
+
+void   uvm_mmap(uint64 begin, uint32 npages, int perm);//mappages
+void   uvm_munmap(uint64 begin, uint32 npages);//unmappages
+
+uint64 uvm_heap_grow(pgtbl_t pgtbl, uint64 heap_top, uint32 len);//grow
+uint64 uvm_heap_ungrow(pgtbl_t pgtbl, uint64 heap_top, uint32 len);//ungrow
+
+void   uvm_copyin(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len);
+void   uvm_copyout(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len);
+int   uvm_copyin_str(pgtbl_t pgtbl, char* dst, uint64 src, uint64 maxlen);
 
 #endif

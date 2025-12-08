@@ -1,29 +1,34 @@
 #include "mem/pmem.h"
+#include "lib/print.h"
 #include "lib/lock.h"
+#include "lib/str.h"
+
+
 
 #define PGROUNDUP(x)   (((x) + PGSIZE - 1) & ~(PGSIZE - 1))
 #define PGROUNDDOWN(x) ((x) & ~(PGSIZE - 1))
 #define PGSIZE 4096
 #define KERNEL_PAGES 2048
 
-// 物理页节点：占据每个物理页的前8字节
+// 物理页节点
 typedef struct page_node {
     struct page_node* next;
 } page_node_t;
 
-// 物理页分配区域
+// 许多物理页构成一个可分配的区域
 typedef struct alloc_region {
-    uint64 begin;         // 起始物理地址
-    uint64 end;           // 终止物理地址
-    spinlock_t lk;        // 自旋锁
-    uint32 allocable;     // 可分配页面数
-    page_node_t list_head;// 链表头
+    uint64 begin;          // 起始物理地址
+    uint64 end;            // 终止物理地址
+    spinlock_t lk;         // 自旋锁(保护下面两个变量)
+    uint32 allocable;      // 可分配页面数    
+    page_node_t list_head; // 可分配链的链头节点
 } alloc_region_t;
 
-// 内核和用户物理页区域
+// 内核和用户可分配的物理页分开
 static alloc_region_t kern_region, user_region;
 
-// 辅助函数：把[lo, hi)范围内的物理页挂到链表
+#define KERN_PAGES 1024 // 内核可分配空间占1024个pages
+
 static void build_free_list(alloc_region_t* r, uint64 lo, uint64 hi) {
     r->allocable = 0;
     r->list_head.next = NULL;
@@ -36,7 +41,7 @@ static void build_free_list(alloc_region_t* r, uint64 lo, uint64 hi) {
     }
 }
 
-// 初始化物理内存
+// 物理内存初始化
 void pmem_init() {
  
     // 内核页区
@@ -52,7 +57,8 @@ void pmem_init() {
     build_free_list(&user_region, user_region.begin, user_region.end);
 }
 
-// 分配一个物理页
+// 返回一个可分配的干净物理页
+// 失败则panic锁死
 void* pmem_alloc(bool in_kernel) {
     alloc_region_t* r = in_kernel ? &kern_region : &user_region;
 
@@ -67,7 +73,8 @@ void* pmem_alloc(bool in_kernel) {
     return node ? (void*)node : NULL;
 }
 
-// 释放一个物理页
+// 释放物理页
+// 失败则panic锁死
 void pmem_free(uint64 page, bool in_kernel) {
     alloc_region_t* r = in_kernel ? &kern_region : &user_region;
 

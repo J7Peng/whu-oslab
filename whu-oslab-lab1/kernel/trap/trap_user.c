@@ -107,7 +107,7 @@ void trap_user_return()
     // tf->kernel_hartid = mycpuid();
 
     
-    uint64 user_satp = MAKE_SATP((uint64)KVA2PA(p->pgtbl));
+    uint64 user_satp = MAKE_SATP((uint64)(p->pgtbl));
 
 
     void (*user_ret_fn)(trapframe_t*, uint64) =

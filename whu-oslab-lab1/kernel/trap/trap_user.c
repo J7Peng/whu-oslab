@@ -4,7 +4,7 @@
 #include "mem/vmem.h"
 #include "memlayout.h"
 #include "riscv.h"
-
+#include "syscall/syscall.h"
 // in trampoline.S
 extern char trampoline[];      // 内核和用户切换的代码
 extern char user_vector[];     // 用户触发trap进入内核
@@ -71,19 +71,15 @@ void trap_user_handler()
     case 8:// syscall
         // 先更新pc，防止重复执行syscall指令
         p->tf->epc = sepc + 4;
-        printf("syscall from user mode\n");
-        //syscall();
-        //intr_on(); // 允许中断
+        //printf("syscall from user mode\n");
+        intr_on(); // 允许中断
+        syscall();
         trap_user_return();
        
     default:
         trap_user_return();
           
     }
-
-
-
-
 
     // 其他异常当作错误
     printf("unexpected user trap scause=%p stval=%d mtvec:%p\n", scause, r_stval());
@@ -97,47 +93,25 @@ void trap_user_handler()
 void trap_user_return()
 {
     proc_t *p = myproc();
-    if (!p) panic("trap_user_return: no current proc");
-    // trapframe_t *tf = p->tf;
+   intr_off();
 
-    // // 填写 kernel 字段（内核仍然访问 tf 的 KVA）
-    // tf->kernel_satp = r_satp();
-    // tf->kernel_sp = p->kstack + PGSIZE;
-    // tf->kernel_trap = (uint64)trap_user_handler;
-    // tf->kernel_hartid = mycpuid();
+    p->tf->kernel_satp = MAKE_SATP(kernel_pgtbl);//内核页表
+    p->tf->kernel_hartid = r_tp();
+    p->tf->kernel_sp = p->kstack+PGSIZE; // 内核栈顶
+    p->tf->kernel_trap = (uint64)trap_user_handler;
 
+    volatile int64 fn = (uint64)TRAMPOLINE + ((uint64)user_return - (uint64)trampoline);
     
-    uint64 user_satp = MAKE_SATP((uint64)(p->pgtbl));
-
-
-    void (*user_ret_fn)(trapframe_t*, uint64) =
-        (void(*)(trapframe_t*, uint64))(TRAMPOLINE + user_return - trampoline);
-
-   
-    // printf("TUR: pid=%d pgtbl_kva=%p pgtbl_pa=%p user_satp=0x%p tf_kva=%p tf_uva=%p epc=%p sp=%p kstack=%p\n",
-    //        p->pid,
-    //        (void*)p->pgtbl,
-    //        (void*)KVA2PA(p->pgtbl),
-    //        (unsigned long)user_satp,
-    //        (void*)tf,
-    //        (void*)TRAPFRAME,
-    //        (void*)tf->epc,
-    //        (void*)tf->sp,
-    //        (void*)p->kstack);
-
-    // printf("TUR: trampoline=%p user_return=%p calling user_return(u_tf=%p, user_satp=0x%p)...\n",
-    //        (void*)trampoline, (void*)user_return, (void*)TRAPFRAME, (unsigned long)user_satp);
-
-    uint64 trampoline_stvec = TRAMPOLINE + (user_vector - trampoline);
-    w_stvec(trampoline_stvec);    
-    w_sepc(p->tf->epc);
-
+    w_stvec((uint64)TRAMPOLINE + ((uint64)user_vector - (uint64)trampoline));
+     //中断相关寄存器设置
     uint64 x = r_sstatus();
     x &= ~SSTATUS_SPP;
-    x |= SSTATUS_SPIE;
+    x |=  SSTATUS_SPIE;
     w_sstatus(x);
-
-    user_ret_fn((trapframe_t*)TRAPFRAME, user_satp);
-
-    panic("trap_user_return: user_return returned");
+    
+    w_sepc(p->tf->epc);  // 不是必须，但一致性OK
+   // printf("trap_user_return:epc=0x%lx\n",  p->tf->epc);
+   
+   ((void (*)(uint64,uint64))fn)((uint64)TRAPFRAME, MAKE_SATP(p->pgtbl));//调用了user_return
+    panic("trap_user_return unreachable");
 }

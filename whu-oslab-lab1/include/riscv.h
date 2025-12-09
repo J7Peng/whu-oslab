@@ -92,6 +92,7 @@ static inline void w_sie(uint64 x)
 #define MIE_MEIE (1L << 11) // external
 #define MIE_MTIE (1L << 7)  // timer
 #define MIE_MSIE (1L << 3)  // software
+#define MIE_STIE (1L << 5)  // supervisor timer
 
 static inline uint64 r_mie()
 {
@@ -316,7 +317,6 @@ static inline void sfence_vma()
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
 
-#define MIE_STIE (1L << 5)
 
 static inline void w_pmpcfg0(uint64 x) {
   asm volatile("csrw pmpcfg0, %0" : : "r"(x));

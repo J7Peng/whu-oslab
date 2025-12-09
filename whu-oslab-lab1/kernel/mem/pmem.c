@@ -8,7 +8,7 @@
 #define PGROUNDUP(x)   (((x) + PGSIZE - 1) & ~(PGSIZE - 1))
 #define PGROUNDDOWN(x) ((x) & ~(PGSIZE - 1))
 #define PGSIZE 4096
-#define KERNEL_PAGES 2048
+
 
 // 物理页节点
 typedef struct page_node {
@@ -27,7 +27,7 @@ typedef struct alloc_region {
 // 内核和用户可分配的物理页分开
 static alloc_region_t kern_region, user_region;
 
-#define KERN_PAGES 1024 // 内核可分配空间占1024个pages
+
 
 static void build_free_list(alloc_region_t* r, uint64 lo, uint64 hi) {
     r->allocable = 0;
@@ -44,14 +44,18 @@ static void build_free_list(alloc_region_t* r, uint64 lo, uint64 hi) {
 // 物理内存初始化
 void pmem_init() {
  
+
+    uint64 free_lo = PGROUNDUP( (uint64)KERNEL_DATA >  (uint64)ALLOC_BEGIN ? (uint64)KERNEL_DATA : (uint64)ALLOC_BEGIN);
+    uint64 free_hi = PGROUNDDOWN((uint64)ALLOC_END);
+    uint64 mid = free_lo + (free_hi - free_lo) / 3;
     // 内核页区
     kern_region.begin = (uint64)ALLOC_BEGIN;
-    kern_region.end   = (uint64)ALLOC_BEGIN + KERNEL_PAGES * PGSIZE;
+    kern_region.end   = (uint64)mid;
     spinlock_init(&kern_region.lk, "kern_pmem");
     build_free_list(&kern_region, kern_region.begin, kern_region.end);
 
     // 用户页区
-    user_region.begin = kern_region.end;
+    user_region.begin = mid;
     user_region.end   = (uint64)ALLOC_END;
     spinlock_init(&user_region.lk, "user_pmem");
     build_free_list(&user_region, user_region.begin, user_region.end);

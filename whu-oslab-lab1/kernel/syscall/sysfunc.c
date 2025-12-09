@@ -1,4 +1,5 @@
 #include "proc/cpu.h"
+#include "proc/proc.h"
 #include "mem/vmem.h"
 #include "mem/pmem.h"
 #include "mem/mmap.h"
@@ -6,13 +7,14 @@
 #include "lib/print.h"
 #include "syscall/sysfunc.h"
 #include "syscall/syscall.h"
+#include "dev/timer.h"
 
 // 堆伸缩
 // uint64 new_heap_top 新的堆顶 (如果是0代表查询, 返回旧的堆顶)
 // 成功返回新的堆顶 失败返回-1
 uint64 sys_brk()
 {
-printf("sys_brk called\n");
+    printf("sys_brk called\n");
     proc_t *p = myproc();
     uint64 new_heap_top;
     arg_uint64(0, &new_heap_top);// 获取参数
@@ -37,7 +39,7 @@ printf("sys_brk called\n");
             return -1;
         }  
         p->heap_top = ret;//更新堆顶
-        printf("sys_brk: heap grow from 0x%lx to 0x%lx\n", old_heap_top, ret);
+        printf("sys_brk: heap grow from %p to %p\n", old_heap_top, ret);
         return ret;
     }
 
@@ -51,10 +53,10 @@ printf("sys_brk called\n");
             return -1;
         }
         p->heap_top = ret;//更新堆顶
-        printf("sys_brk: heap ungrow from 0x%lx to 0x%lx\n", old_heap_top, ret);
+        printf("sys_brk: heap ungrow from %p to %p\n", old_heap_top, ret);
         return ret;
     }
-    printf("sys_brk: heap top unchanged at 0x%lx\n", old_heap_top);
+    printf("sys_brk: heap top unchanged at %p\n", old_heap_top);
     return old_heap_top;//堆顶不变
 }
 
@@ -64,7 +66,7 @@ printf("sys_brk called\n");
 // 成功返回映射空间的起始地址, 失败返回-1
 uint64 sys_mmap()
 {
-    return 0;
+    return -1;
 }
 
 // 取消内存映射
@@ -73,7 +75,7 @@ uint64 sys_mmap()
 // 成功返回0 失败返回-1
 uint64 sys_munmap()
 {
-    return 0;
+    return -1;
 }
 
 // copyin 测试 (int 数组)
@@ -123,5 +125,76 @@ uint64 sys_copyinstr()
     arg_str(0, s, 64);
     printf("get str from user: %s\n", s);
 
+    return 0;
+}
+
+uint64 sys_print()
+{
+    //printf("sys_print called:");
+    uint64 addr;
+   
+    arg_uint64(0,&addr);
+    if(addr< 0)
+    {
+        return -1;
+    }
+
+    char buf[1024];
+    if(uvm_copyin_str(myproc()->pgtbl, buf, addr, sizeof(buf)) < 0)
+    {
+        return -1;
+    }
+ 
+    printf("%s", buf);
+ 
+    return strlen(buf);
+}
+
+// 进程复制
+uint64 sys_fork()
+{
+    //printf("sys_fork called\n");
+    return proc_fork();
+}
+
+// 进程等待
+// uint64 addr  子进程退出时的exit_state需要放到这里 
+uint64 sys_wait()
+{
+   // printf("sys_wait called\n");
+    printf("sys_wait: called by pid=%d\n", myproc()->pid);
+    uint64 p;
+    arg_uint64(0, &p);
+    return proc_wait(p);
+}
+
+// 进程退出
+// int exit_state
+uint64 sys_exit()
+{
+    printf("proc_exit: pid=%d parent=%p(%d)\n", myproc()->pid, myproc()->parent, myproc()->parent ? myproc()->parent->pid : -1);
+    
+    int n;
+    arg_uint32(0, (uint32*)&n);
+    proc_exit(n);
+    return 0;// not reached
+}
+
+extern timer_t sys_timer;
+
+// 进程睡眠一段时间
+// uint32 second 睡眠时间
+// 成功返回0, 失败返回-1
+uint64 sys_sleep()
+{
+
+    int n,ticks0;
+    arg_uint32(0, (uint32*)&n);
+    spinlock_acquire(&sys_timer.lk);
+    ticks0 = sys_timer.ticks;
+    while (sys_timer.ticks - ticks0 < n) {
+        proc_sleep(&sys_timer, &sys_timer.lk);
+    }
+    spinlock_release(&sys_timer.lk);
     return 0;
 }

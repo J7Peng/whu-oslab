@@ -244,3 +244,77 @@ int uvm_copyin_str(pgtbl_t pgtbl, char* dst, uint64 src, uint64 maxlen)
         return -1;
     }
 }
+
+int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 heap_top,uint32 ustack_pages)
+{
+   
+    pte_t *pte;
+    uint64 pa, i;
+    uint64 flags;
+    char *mem;
+    
+    for( i =PGSIZE;i<heap_top;i+=PGSIZE)
+    {
+        if((pte = vm_getpte(old, i, false))==0)
+        {
+            panic("uvmcopy: vm_getpte failed");
+        }
+        if((*pte & PTE_V) ==0)
+        {
+            panic("uvmcopy: page not present");
+        }
+        pa = PTE_TO_PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if((mem= (char*)pmem_alloc(false))==0)
+        {
+            goto err;
+        }
+        memmove(mem, (char*)pa, PGSIZE);
+        vm_mappages(new, i, (uint64)mem, PGSIZE, flags);
+    }
+    //用户栈复制
+    uint64 stack_top = TRAPFRAME;
+    uint64 stack_base = stack_top - ustack_pages * PGSIZE;
+    for( i = stack_base;i<stack_top;i+=PGSIZE)
+    {
+        if((pte = vm_getpte(old, i, false))==0)
+        {
+            panic("uvmcopy: vm_getpte failed for ustack");
+        }
+        // //////////fortest
+        // printf("uvmcopy: ustack i=%p\n", i);
+        // if (pte == 0) {
+        //     printf(" ustack: pte == NULL\n");
+        // } else {
+        //     printf(" ustack: *pte=%p, PTE_V=%d, PTE_U=%d, PA=%p, flags=%p\n",
+        //         (uint64)*pte,
+        //         ((*pte & PTE_V) != 0),
+        //         ((*pte & PTE_U) != 0),      // 如果你有 PTE_U
+        //         PTE_TO_PA(*pte),
+        //         PTE_FLAGS(*pte));
+        // }
+        // printf(" TRAPFRAME=%p, ustack_pages=%d, stack_base=%p, stack_top=%p\n",
+        //     (uint64)TRAPFRAME, (unsigned)ustack_pages, (uint64)stack_base, (uint64)stack_top);
+//  ////////////     
+        if((*pte & PTE_V) ==0)
+        {
+            panic("uvmcopy: page not present for ustack");
+        }
+  
+
+        
+        pa = PTE_TO_PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if((mem= (char*)pmem_alloc(false))==0)
+        {
+            goto err;
+        }
+        memmove(mem, (char*)pa, PGSIZE);
+        vm_mappages(new, i, (uint64)mem, PGSIZE, flags);
+    }
+    return 0;
+
+err:
+    uvm_munmap(0, i / PGSIZE);
+    return -1;
+}

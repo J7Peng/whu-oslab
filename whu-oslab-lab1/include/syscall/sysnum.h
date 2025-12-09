@@ -7,5 +7,10 @@
 #define SYS_copyin       4
 #define SYS_copyout      5
 #define SYS_copyinstr    6
+#define SYS_print        7   
+#define SYS_fork         8
+#define SYS_wait         9
+#define SYS_exit         10
+#define SYS_sleep        11
 
 #endif

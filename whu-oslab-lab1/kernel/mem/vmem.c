@@ -54,26 +54,24 @@ pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc) {
 }
 
 
+
 /* ---------- vm_mappages ----------
  */
 void vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm) {
     uint64 start = va;
     uint64 end = va + len;
 
-    while (start < end) {
-        uint64 a = PG_ROUND_DOWN(start);
-        pte_t* pte = vm_getpte(pgtbl, a, true);
-        if (!pte) {
+    while(start < end)
+    {
+        uint64 a = PG_ROUND_DOWN(start);//对齐到页边界
+        pte_t* pte = vm_getpte(pgtbl,a,true);//取出对应的页表项
+        if(!pte)
+        {
             panic("vm_mappages: vm_getpte failed");
+            return;
         }
-
-        if (*pte & PTE_V) {
-            // 改进：允许覆盖已有映射
-        }
-
-        *pte = PA_TO_PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
-
-
+        if (perm & PTE_W) perm |= PTE_R;
+        *pte = PA_TO_PTE(pa) | (perm&0x3ff) | PTE_V;//设置页表项
         start = a + PGSIZE;
         pa += PGSIZE;
     }

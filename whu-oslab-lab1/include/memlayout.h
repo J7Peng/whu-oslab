@@ -9,9 +9,9 @@
 #define UART_BASE  0x10000000ul
 #define UART_IRQ   10
 
-// UART
-#define UART_BASE  0x10000000ul
-#define UART_IRQ   10
+// Virtio 相关
+#define VIRTIO_IRQ 1
+#define VIRTIO_BASE 0x10001000ul
 
 // platform-level interrupt controller(PLIC)
 #define PLIC_BASE 0x0c000000ul

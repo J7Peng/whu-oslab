@@ -9,4 +9,7 @@ int   memcmp(const void *a, const void *b, int64 n);
 void *memcpy(void* dst, const void* src, uint64 n);
 int   strlen(const char *s);
 
+unsigned long kstrlen(const char *s);
+int strncmp(const char *s1, const char *s2, uint64 n);
+
 #endif

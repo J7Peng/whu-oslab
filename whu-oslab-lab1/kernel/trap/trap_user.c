@@ -21,21 +21,12 @@ extern char* exception_info[16]; // 异常错误信息
 // 用户态trap处理的核心逻辑
 //for test
 extern pgtbl_t kernel_pgtbl;
-long syscall_dispatch(long n, long a0, long a1, long a2)
-{
-    switch(n) {
-    case 0:
-        printf("[sys_print] hello from user!\n");
-        return 0;
-    default:
-        printf("unknown syscall %ld\n", n);
-        return -1;
-    }
-}
+
 
 
 void trap_user_handler()
 {
+    w_stvec((uint64)kernel_vector);
 
     uint64 scause = r_scause();
     uint64 sepc = r_sepc();
@@ -46,14 +37,17 @@ void trap_user_handler()
     assert((r_sstatus() & SSTATUS_SPP) == 0, "not from user mode");
 // printf("<<< trap_user_handler ENTER: pid=%d scause=%p sepc=%p a7=%d a0=%d >>>\n",
 //            p ? p->pid : -1, scause, sepc, tf->a7, tf->a0);
-
+    
     uint64 trap_id = scause & 0xf; 
     if((scause>>63) & 1)
     {
         switch (trap_id)
         {
         case 5:
-            timer_interrupt_handler();    // 里面会续期: stimecmp = time + INTERVAL
+            timer_interrupt_handler();   
+            if (p != 0 && p->state == RUNNING) {
+                proc_yield();
+            }
             trap_user_return();
             
         case 9:
@@ -87,13 +81,11 @@ void trap_user_handler()
 }
 
 
-
-
-
 void trap_user_return()
 {
+    //printf("trap_user_return\n");
     proc_t *p = myproc();
-   intr_off();
+    intr_off();
 
     p->tf->kernel_satp = MAKE_SATP(kernel_pgtbl);//内核页表
     p->tf->kernel_hartid = r_tp();
@@ -109,8 +101,8 @@ void trap_user_return()
     x |=  SSTATUS_SPIE;
     w_sstatus(x);
     
-    w_sepc(p->tf->epc);  // 不是必须，但一致性OK
-   // printf("trap_user_return:epc=0x%lx\n",  p->tf->epc);
+    w_sepc(p->tf->epc);  
+
    
    ((void (*)(uint64,uint64))fn)((uint64)TRAPFRAME, MAKE_SATP(p->pgtbl));//调用了user_return
     panic("trap_user_return unreachable");

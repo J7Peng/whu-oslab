@@ -1,6 +1,5 @@
-// 这个头文件通常认为其他.h文件都应该include
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __TYPE_H__
+#define __TYPE_H__
 
 // 类型定义
 
@@ -20,12 +19,18 @@ typedef enum {false = 0, true = 1} bool;
 #define NULL ((void*)0)
 #endif
 
-#define NCPU 1
-#define PGSIZE 4096
+// 目录定义
+typedef struct dirent {
+    uint16 inode_num;
+    char name[30];
+} dirent_t;
 
-#define SECTOR_SIZE 512           // sector大小(buf->data)
-#define SEC_PER_BLO 8             // sector per block
-
-#define BLOCK_NUM_UNUSED 0xFFFFFFFF
+// 文件状态定义
+typedef struct file_state {
+    uint16 type;
+    uint16 inode_num;
+    uint16 nlink;
+    uint32 size;
+} fstat_t;
 
 #endif

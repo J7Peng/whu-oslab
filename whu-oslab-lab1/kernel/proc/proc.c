@@ -8,6 +8,11 @@
 #include "memlayout.h"
 #include "riscv.h"
 
+#include "fs/fs.h"
+#include "fs/dir.h"
+#include "fs/inode.h"
+#include "fs/file.h"
+
 /*----------------外部空间------------------*/
 
 // in trampoline.S
@@ -52,11 +57,18 @@ static int alloc_pid()
     return tmp;
 }
 
+// 释放锁 + 调用 trap_user_return
 static void fork_return()
-{
+{   
+    static int first = 1;
     // 由于调度器中上了锁，所以这里需要解锁
     proc_t* p = myproc();
     spinlock_release(&p->lk);
+    if(first)
+    {
+        first = 0;
+        fs_init();
+    }
     trap_user_return();
 }
 
@@ -144,6 +156,10 @@ void proc_make_first()
     p->tf->kernel_sp = p->kstack+PGSIZE; // 内核栈顶
     p->tf->kernel_trap = (uint64)trap_user_handler;
     p->state = RUNNABLE;
+
+    struct cpu *c = mycpu();
+    c->proc = p;
+    p->cwd = path_to_inode("/");// 设置当前工作目录为根目录
     spinlock_release(&p->lk);
 
     printf("proczero: pid=%d state=%d tf=%p pgtbl=%p kstack=%p\n",
@@ -210,7 +226,7 @@ FOUND:
 
 void proc_free(proc_t* p)
 {
-     if (p->pgtbl) {
+    if (p->pgtbl) {
         if (p->heap_top > PGSIZE) {
             uint64 len = p->heap_top - PGSIZE;
             vm_unmappages(p->pgtbl, PGSIZE, len, true);
@@ -254,7 +270,7 @@ void proc_init()
       spinlock_init(&p->lk, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - procs));
-  }
+    }
 }
 
 static void proc_wakeup_one(proc_t* p)
@@ -292,6 +308,17 @@ int proc_fork()
     
     *(np->tf) =*(p->tf);//复制trapframe
     np->tf->a0 = 0;//子进程返回值为0
+
+    for(int i = 0;i < FILE_PER_PROC;i++)
+    {
+        if(p->filelist[i])
+        {
+            np->filelist[i] = file_dup(p->filelist[i]);
+        }
+    }
+   
+    np->cwd = inode_dup(p->cwd);
+
     pid = np->pid;
     spinlock_release(&np->lk);
     spinlock_acquire(&wait_lock);
@@ -308,6 +335,12 @@ int proc_fork()
 
 void proc_yield()
 {
+    proc_t *p = myproc();
+
+    spinlock_acquire(&p->lk);
+    p->state = RUNNABLE;
+    proc_sched();
+    spinlock_release(&p->lk);
 
 }
 //////
@@ -422,9 +455,9 @@ void proc_sched()
     if(intr_get())
         panic("proc_sched: interruptible");
 
-    printf("proc_sched: ENTER p=%p pid=%d state=%d sleep_space=%p cpu->proc=%p ctx.ra=%p ctx.sp=%p\n",
-           (void*)p, p->pid, p->state, p->sleep_space, (void*)mycpu()->proc,
-           (void*)p->ctx.ra, (void*)p->ctx.sp);
+    // printf("proc_sched: ENTER p=%p pid=%d state=%d sleep_space=%p cpu->proc=%p ctx.ra=%p ctx.sp=%p\n",
+    //        (void*)p, p->pid, p->state, p->sleep_space, (void*)mycpu()->proc,
+    //        (void*)p->ctx.ra, (void*)p->ctx.sp);
 
     origin = mycpu()->origin;
 
@@ -434,9 +467,9 @@ void proc_sched()
     swtch(&p->ctx, &mycpu()->ctx);
     mycpu()->origin = origin;
 
-    printf("proc_sched: RETURN p=%p pid=%d now cpu->proc=%p ctx.ra=%p ctx.sp=%p\n",
-           (void*)p, p->pid, (void*)mycpu()->proc,
-           (void*)p->ctx.ra, (void*)p->ctx.sp);
+    // printf("proc_sched: RETURN p=%p pid=%d now cpu->proc=%p ctx.ra=%p ctx.sp=%p\n",
+    //        (void*)p, p->pid, (void*)mycpu()->proc,
+    //        (void*)p->ctx.ra, (void*)p->ctx.sp);
 
 }
 
@@ -494,5 +527,16 @@ void proc_wakeup(void* sleep_space)
             }
             spinlock_release(&p->lk);
        }
+    }
+}
+
+void 
+either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
+{
+    proc_t *p = myproc();
+    if(user_dst) {
+        uvm_copyout(p->pgtbl, dst, (uint64)src, len);
+    } else {
+        memmove((void *)dst, src, len);
     }
 }

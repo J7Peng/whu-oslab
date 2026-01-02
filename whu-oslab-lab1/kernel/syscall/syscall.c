@@ -8,18 +8,30 @@
 
 // 系统调用跳转
 static uint64 (*syscalls[])(void) = {
+    [SYS_exec]          sys_exec,
     [SYS_brk]           sys_brk,
     [SYS_mmap]          sys_mmap,
     [SYS_munmap]        sys_munmap,
-    [SYS_copyin]        sys_copyin,
-    [SYS_copyout]       sys_copyout,
-    [SYS_copyinstr]     sys_copyinstr,
-    [SYS_print]         sys_print, 
+    
     [SYS_fork]          sys_fork,
     [SYS_wait]          sys_wait,
     [SYS_exit]          sys_exit,
     [SYS_sleep]         sys_sleep,
+    
+    [SYS_open]          sys_open,
+    [SYS_close]         sys_close,
+    [SYS_read]          sys_read,
+    [SYS_write]         sys_write,
+    [SYS_lseek]         sys_lseek,
+    [SYS_dup]           sys_dup,
+    [SYS_fstat]         sys_fstat,
+    [SYS_getdir]        sys_getdir,
+    [SYS_mkdir]         sys_mkdir,
+    [SYS_chdir]         sys_chdir,
+    [SYS_link]          sys_link,
+    [SYS_unlink]        sys_unlink,
 };
+
 // 系统调用
 void syscall()
 {
@@ -27,6 +39,8 @@ void syscall()
     proc_t* p = myproc();
 
     num = p->tf->a7;
+    // printf("syscall: pid=%d num=%d\n", myproc()->pid, num);
+
     if(num>0&&num<=(sizeof(syscalls)/sizeof(syscalls[0]))&&syscalls[num])
     {
         uint64 ret = syscalls[num]();
@@ -91,3 +105,4 @@ void arg_str(int n, char* buf, int maxlen)
 
     uvm_copyin_str(p->pgtbl, (char*)buf, addr, maxlen);
 }
+

@@ -3,6 +3,9 @@
 
 #include "common.h"
 #include "lib/lock.h"
+
+#include "fs/inode.h"
+#include "fs/file.h"
 // 页表类型定义
 typedef uint64* pgtbl_t;
 
@@ -90,7 +93,7 @@ enum proc_state {
     ZOMBIE,       // 濒临死亡
 };
 
-
+#define FILE_PER_PROC 16  // 每个进程允许打开的最大文件数
 // 进程定义
 typedef struct proc {
     
@@ -112,6 +115,10 @@ typedef struct proc {
 
     uint64 kstack;           // 内核栈的虚拟地址
     context_t ctx;           // 内核态进程上下文
+
+    
+    inode_t* cwd;              // 当前工作目录
+    file_t *filelist[FILE_PER_PROC]; // 进程打开的文件列表
 } proc_t;
 
 
@@ -133,4 +140,5 @@ void     proc_wakeup(void* sleep_space);               // 进程唤醒
 void     proc_sched();                                 // 进程切换到调度器
 void     proc_scheduler();                             // 调度器
 
+void      either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 #endif

@@ -6,7 +6,7 @@
 #include "proc/cpu.h"
 #include "memlayout.h"
 #include "riscv.h"
-
+#include "dev/vio.h"
 // 中断信息
 static char* interrupt_info[16] = {
     "U-mode software interrupt",      // 0
@@ -81,6 +81,9 @@ void external_interrupt_handler()
     case UART_IRQ:             // 串口中断（键盘输入）
         uart_intr();
         break;
+    case VIRTIO_IRQ:        //  磁盘中断
+        virtio_disk_intr(); // 完成请求、清 b->disk、wakeup(b)、回收desc
+        break;
     default:
         printf("unexpected PLIC irq=%d on hart=%d\n", irq, hart);
         break;
@@ -91,7 +94,6 @@ void external_interrupt_handler()
 // 时钟中断处理 (基于CLINT)
 void timer_interrupt_handler()
 {
-    
     
     int hart = mycpuid();
 
@@ -116,7 +118,7 @@ void trap_kernel_handler()
     // 确认trap来自S-mode且此时trap处于关闭状态
     //assert(sstatus & SSTATUS_SPP, "trap_kernel_handler: not from s-mode");
     //assert(intr_get() == 0, "trap_kernel_handler: interreput enabled");
-
+    int need_yield = 0; 
     int trap_id = scause & 0xf; 
 
     if ( (scause >> 63) & 1) {
@@ -124,6 +126,8 @@ void trap_kernel_handler()
         switch(trap_id) {
             case 5: // S-mode timer interrupt
                 timer_interrupt_handler();
+                if(myproc()!=0&&myproc()->state==RUNNING)
+                need_yield = 1;
                 break;
             case 9: // S-mode external interrupt
                 external_interrupt_handler();
@@ -157,7 +161,10 @@ void trap_kernel_handler()
         else
             panic("Unknown exception");
     }
-
+    if(need_yield)
+    {
+        proc_yield();
+    }
     // 返回S-mode指令地址
     w_sepc(sepc);
 }

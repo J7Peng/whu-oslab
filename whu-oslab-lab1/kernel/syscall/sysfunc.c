@@ -198,3 +198,7 @@ uint64 sys_sleep()
     spinlock_release(&sys_timer.lk);
     return 0;
 }
+
+uint64 sys_exec(){
+    return 0;
+}
